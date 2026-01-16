@@ -4,6 +4,9 @@
 [![pyversions](https://img.shields.io/pypi/pyversions/telegram-send.svg)](https://pypi.org/project/telegram-send/)
 [![Downloads](https://img.shields.io/pypi/dm/telegram-send)](https://pypistats.org/packages/telegram-send)
 [![License](https://img.shields.io/badge/License-GPLv3+-blue.svg)](https://github.com/rahiel/telegram-send/blob/master/LICENSE.txt)
+[![Debian package](https://img.shields.io/debian/v/telegram-send)](https://packages.debian.org/sid/telegram-send)
+[![Ubuntu Package Version](https://img.shields.io/ubuntu/v/telegram-send)](https://packages.debian.org/sid/telegram-send)
+
 
 Telegram-send is a command-line tool to send messages and files over Telegram to
 your account, to a group or to a channel. It provides a simple interface that
@@ -27,6 +30,7 @@ can be easily called from other programs.
   - [How to use a proxy?](#how-to-use-a-proxy)
   - [How to send the same message to multiple users?](#how-to-send-the-same-message-to-multiple-users)
   - [How to get sticker files?](#how-to-get-sticker-files)
+  - [Other Questions](#other-questions)
 - [Uninstallation](#uninstallation)
 
 <!-- markdown-toc end -->
@@ -44,7 +48,7 @@ To send a message using Markdown or HTML formatting:
 ```shell
 telegram-send --format markdown "Only the *bold* use _italics_"
 telegram-send --format html "<pre>fixed-width messages</pre> are <i>also</i> supported"
-telegram-send --format markdown "||Do good and find good!||"
+telegram-send --format markdown "||Do good and find good\!||"  # spoiler
 ```
 Note that not all Markdown syntax or all HTML tags are supported. For more
 information on supported formatting, see the [formatting options][]. We use the
@@ -275,12 +279,12 @@ apt-get moo | telegram-send --pre --stdin
 
 You can set a proxy with an environment variable:
 ``` shell
-https_proxy=https://ip:port telegram-send "hello"
+HTTPS_PROXY=https://ip:port telegram-send "hello"
 ```
 
 Within Python you can set the environment variable with:
 ``` python
-os.environ["https_proxy"] = "https://ip:port"
+os.environ["HTTPS_PROXY"] = "https://ip:port"
 ```
 
 If you have a SOCKS proxy, you need to install support for it:
@@ -314,6 +318,11 @@ telegram-send --config user1.conf \
 
 In Telegram Desktop you right click a sticker and choose "Save Image As...". You
 can then send the saved `webp` file with `telegram-send --sticker sticker.webp`.
+
+## Other Questions
+
+There are many answered questions and answers in the issue tracker:
+https://github.com/rahiel/telegram-send/issues?q=is%3Aissue%20state%3Aclosed%20label%3Aquestion
 
 # Uninstallation
 
