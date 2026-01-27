@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 # telegram-send - Send messages and files over Telegram from the command-line
 # Copyright (C) 2016-2026  Rahiel Kasim
 #
@@ -25,11 +24,10 @@ from os import makedirs, remove
 from os.path import dirname, exists, expanduser, join
 from random import randint
 from shutil import which
-from typing import NamedTuple, Union
+from typing import NamedTuple
 from subprocess import check_output
 from warnings import warn
 
-import colorama
 import telegram
 from telegram.constants import MessageLimit
 
@@ -42,6 +40,13 @@ except ImportError:
     pass
 
 
+try:
+    from colorama import just_fix_windows_console
+    just_fix_windows_console()
+except ImportError:
+    pass
+
+
 global_config = "/etc/telegram-send.conf"
 
 
@@ -50,7 +55,6 @@ def main():
 
 
 async def run():
-    colorama.init()
     parser = argparse.ArgumentParser(description="Send messages and files over Telegram.",
                                      epilog="Homepage: https://github.com/rahiel/telegram-send")
     parser.add_argument("message", help="message(s) to send", nargs="*")
@@ -88,8 +92,10 @@ async def run():
     parser.add_argument("--clean", help="Clean %(prog)s configuration files.", action="store_true")
     parser.add_argument("--timeout", help="Set the read timeout for network operations. (in seconds)",
                         type=float, default=30., action="store")
-    parser.add_argument("--version", action="version", version="%(prog)s {}".format(__version__))
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     args = parser.parse_args()
+
+    conf : list[str | None]
 
     if args.global_config:
         conf = [global_config]
@@ -146,22 +152,19 @@ async def run():
             )
         if args.showids and message_ids:
             smessage_ids = [str(m) for m in message_ids]
-            print("message_ids " + " ".join(smessage_ids))
+            print(f"message_ids {' '.join(smessage_ids)}")
     except ConfigError as e:
         print(markup(str(e), "red"))
-        cmd = "telegram-send --configure"
-        if args.global_config:
-            cmd = "sudo " + cmd + " --global-config"
-        print("Please run: " + markup(cmd, "bold"))
+        print(f"Please read the docs and configure correctly.")
         sys.exit(1)
     except telegram.error.NetworkError as e:
         if "timed out" in str(e).lower():
             print(markup("Error: Connection timed out", "red"))
             print("Please run with a longer timeout.\n"
-                  "Try with the option: " + markup("--timeout {}".format(args.timeout + 10), "bold"))
+                  f"Try with the option: {markup(f'--timeout {args.timeout + 10}', 'bold')}")
             sys.exit(1)
         else:
-            raise(e)
+            raise e
 
 
 async def send(*,
@@ -188,17 +191,17 @@ async def send(*,
 
     - conf (str): Path of configuration file to use. Will use the default config if not specified.
                    `~` expands to user's home directory.
-    - messages (List[str]): The messages to send.
+    - messages (list[str]): The messages to send.
     - parse_mode (str): Specifies formatting of messages, one of `["text", "markdown", "html"]`.
     - pre (bool): Send messages as preformatted fixed width (monospace) text.
-    - files (List[file]): The files to send.
-    - images (List[file]): The images to send.
-    - stickers (List[file]): The stickers to send.
-    - animations (List[file]): The animations to send.
-    - videos (List[file]): The videos to send.
-    - audios (List[file]): The audios to send.
-    - captions (List[str]): The captions to send with the images/files/animations/videos or audios.
-    - locations (List[str]): The locations to send. Locations are strings containing the latitude and longitude
+    - files (list[file]): The files to send.
+    - images (list[file]): The images to send.
+    - stickers (list[file]): The stickers to send.
+    - animations (list[file]): The animations to send.
+    - videos (list[file]): The videos to send.
+    - audios (list[file]): The audios to send.
+    - captions (list[str]): The captions to send with the images/files/animations/videos or audios.
+    - locations (list[str]): The locations to send. Locations are strings containing the latitude and longitude
                              separated by whitespace or a comma.
     - silent (bool): Send silently without sound.
     - disable_web_page_preview (bool): Disables web page previews for all links in the messages.
@@ -328,7 +331,7 @@ async def delete(message_ids, conf=None, timeout=30):
 
     # Arguments
 
-    - message_ids (List[str]): The messages ids of all messages to be deleted.
+    - message_ids (list[str]): The messages ids of all messages to be deleted.
     - conf (str): Path of configuration file to use. Will use the default config if not specified.
                   `~` expands to user's home directory.
     - timeout (int|float): The read timeout for network connections in seconds.
@@ -342,27 +345,28 @@ async def delete(message_ids, conf=None, timeout=30):
         for m in message_ids:
             try:
                 await bot.delete_message(chat_id=chat_id, message_id=m, read_timeout=timeout)
-            except telegram.TelegramError as e:
+            except telegram.error.TelegramError as e:
                 warn(markup(f"Deleting message with id={m} failed: {e}", "red"))
 
 
-async def configure(conf, channel=False, group=False, fm_integration=False):
+async def configure(conf=None, channel=False, group=False, fm_integration=False):
     """Guide user to set up the bot, saves configuration at `conf`.
 
     # Arguments
 
     - conf (str): Path where to save the configuration file. May contain `~` for
                   user's home.
-    - channel (Optional[bool]): Configure a channel.
-    - group (Optional[bool]): Configure a group.
-    - fm_integration (Optional[bool]): Setup file manager integration.
+    - channel (bool, optional): Configure a channel.
+    - group (bool, optional): Configure a group.
+    - fm_integration (bool, optional): Setup file manager integration.
     """
     conf = expanduser(conf) if conf else get_config_path()
-    prompt = "❯ " if not sys.platform.startswith("win32") else "> "
+    prompt = "❯ "
     contact_url = "https://telegram.me/"
+    root_topic_message = None
 
-    print("Talk with the {} on Telegram ({}), create a bot and insert the token"
-          .format(markup("BotFather", "cyan"), contact_url + "BotFather"))
+    print(f"Talk with the {markup('BotFather', 'cyan')} on Telegram ({contact_url}BotFather), "
+          "create a bot and insert the token")
     try:
         token = input(markup(prompt, "magenta")).strip()
     except UnicodeEncodeError:
@@ -374,16 +378,16 @@ async def configure(conf, channel=False, group=False, fm_integration=False):
         bot = telegram.Bot(token)
         bot_details = await bot.get_me()
         bot_name = bot_details.username
+        assert bot_name is not None
     except Exception as e:
-        print("Error: {}".format(e))
+        print(f"Error: {e}")
         print(markup("Something went wrong, please try again.\n", "red"))
         return await configure(conf, channel=channel, group=group, fm_integration=fm_integration)
 
-    print("Connected with {}.\n".format(markup(bot_name, "cyan")))
+    print(f"Connected with {markup(bot_name, 'cyan')}.\n")
 
     if channel:
-        print("Do you want to send to a {} or a {} channel? [pub/priv]"
-              .format(markup("public", "bold"), markup("private", "bold")))
+        print(f"Do you want to send to a {markup('public', 'bold')} or a {markup('private', 'bold')} channel? [pub/priv]")
         channel_type = input(markup(prompt, "magenta")).strip()
         if channel_type.startswith("pub"):
             print(
@@ -405,6 +409,9 @@ async def configure(conf, channel=False, group=False, fm_integration=False):
             )
             url = input(markup(prompt, "magenta")).strip()
             match = re.match(r".+web\.(telegram|tlgr)\.org\/\?legacy=1#\/im\?p=c(?P<chat_id>\d+)_\d+", url)
+            if not match:
+                print(markup("Invalid URL.", "red"))
+                return await configure(conf, channel=channel, group=group, fm_integration=fm_integration)
             chat_id = "-100" + match.group("chat_id")
 
         authorized = False
@@ -414,20 +421,19 @@ async def configure(conf, channel=False, group=False, fm_integration=False):
                 authorized = True
             except (telegram.error.Forbidden, telegram.error.BadRequest):
                 # Telegram returns a BadRequest when a non-admin bot tries to send to a private channel
-                input("Please add {} as administrator to your channel and press Enter"
-                      .format(markup(bot_name, "cyan")))
+                input(f"Please add {markup(bot_name, 'cyan')} as administrator to your channel and press Enter")
         print(markup("\nCongratulations! telegram-send can now post to your channel!", "green"))
     else:
         password = "".join([str(randint(0, 9)) for _ in range(5)])
         bot_url = contact_url + bot_name
         fancy_bot_name = markup(bot_name, "cyan")
         if group:
-            password = "/{}@{}".format(password, bot_name)
-            print("Please add {} to your group\nand send the following message to the group: {}\n"
-                  .format(fancy_bot_name, markup(password, "bold")))
+            password = f"/{password}@{bot_name}"
+            print(f"Please add {fancy_bot_name} to your group\nand send the following message to the group: "
+                  f"{markup(password, 'bold')}\n")
         else:
-            print("Please add {} on Telegram ({})\nand send it the password: {}\n"
-                  .format(fancy_bot_name, bot_url, markup(password, "bold")))
+            print(f"Please add {fancy_bot_name} on Telegram ({bot_url})\nand send it the password: "
+                  f"{markup(password, 'bold')}\n")
 
         update, update_id = None, None
 
@@ -454,24 +460,22 @@ async def configure(conf, channel=False, group=False, fm_integration=False):
             try:
                 update, update_id = await get_user()
             except Exception as e:
-                print("Error! {}".format(e))
+                print(f"Error! {e}")
 
         chat_id = update.message.chat_id
         user = update.message.from_user.username or update.message.from_user.first_name
-        root_topic_message = None
 
         if update.message.chat.is_forum:
             root_topic_message = get_root_topic_message(update.message)
 
-        m = ("Congratulations {}! ".format(user), "\ntelegram-send is now ready for use!")
-        ball = "🎊"
-        print(markup("".join(m), "green"))
+        text = f"🎊 Congratulations {user}! 🎊\ntelegram-send is now ready for use!"
+        print(markup(text, "green"))
 
-        kwargs = {
-            "reply_to_message_id": root_topic_message.message_id if isinstance(root_topic_message, telegram.Message) else None
-        }
-
-        await bot.send_message(chat_id=chat_id, text=ball + " " + m[0] + ball + m[1], **kwargs)
+        await bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            reply_to_message_id=root_topic_message.message_id if isinstance(root_topic_message, telegram.Message) else None
+        )
 
     config = configparser.ConfigParser()
 
@@ -539,7 +543,7 @@ def clean():
             remove(global_config)
         except OSError:
             print(markup("Can't delete /etc/telegram-send.conf", "red"))
-            print("Please run: " + markup("sudo telegram-send --clean", "bold"))
+            print(f"Please run: {markup('sudo telegram-send --clean', 'bold')}")
             sys.exit(1)
 
 
@@ -549,25 +553,26 @@ class ConfigError(Exception):
 
 class Settings(NamedTuple):
     token: str
-    chat_id: Union[int, str]
-    reply_to_message_id: Union[int, str, None]
+    chat_id: int | str
+    reply_to_message_id: int | str | None
 
 
 def get_config_settings(conf=None) -> Settings:
     conf = expanduser(conf) if conf else get_config_path()
     config = configparser.ConfigParser()
     if not config.read(conf) or not config.has_section("telegram"):
-        raise ConfigError("Config not found")
+        raise ConfigError(f"Config not found: {conf}")
+
     missing_options = set(["token", "chat_id"]) - set(config.options("telegram"))
     if len(missing_options) > 0:
-        raise ConfigError("Missing options in config: {}".format(", ".join(missing_options)))
+        raise ConfigError(f"Missing options in config: {', '.join(missing_options)}")
+
     token = config.get("telegram", "token")
-    chat_id = config.get("telegram", "chat_id")
-    reply_to_message_id = config.get("telegram", "reply_to_message_id", fallback=None)
-    if chat_id.isdigit():
-        chat_id = int(chat_id)
-    if reply_to_message_id is not None and reply_to_message_id.isdigit():
-        reply_to_message_id = int(reply_to_message_id)
+    chat = config.get("telegram", "chat_id")
+    reply = config.get("telegram", "reply_to_message_id", fallback=None)
+
+    chat_id = int(chat) if chat.isdigit() else chat
+    reply_to_message_id = int(reply) if reply and reply.isdigit() else reply
     return Settings(token=token, chat_id=chat_id, reply_to_message_id=reply_to_message_id)
 
 
